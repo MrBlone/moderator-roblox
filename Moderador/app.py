@@ -6,46 +6,61 @@ app = Flask(__name__)
 
 @app.route('/chat', methods=['POST'])
 def analizar_contexto():
-    # Obtiene la clave justo cuando llega el mensaje de Roblox
-    api_key = os.environ.get("GROQ_API_KEY")
-
-    if not api_key:
-        print("ERROR: GROQ_API_KEY no encontrada en Render")
-        return jsonify({"decision": "OK", "error": "Falta API Key"}), 500
-
     try:
-        data = request.json or {}
-        usuario = data.get("usuario", "Jugador")
-        mensaje = data.get("prompt", "")
+        api_key = os.environ.get("GROQ_API_KEY")
 
-        # Inicializa el cliente únicamente dentro de la petición
+        if not api_key:
+            print("ERROR: GROQ_API_KEY no encontrada.")
+            return jsonify({"decision": "OK", "error": "No API Key"}), 200
+
+        # Obtener los datos enviados por Roblox
+        data = request.get_json(force=True, silent=True) or {}
+        usuario = str(data.get("usuario", "Jugador"))
+        mensaje = str(data.get("prompt", "")).strip()
+
+        # Si el mensaje está vacío, responder OK inmediatamente sin llamar a Groq
+        if not mensaje:
+            return jsonify({"decision": "OK"}), 200
+
+        # Crear el cliente de Groq
         client = Groq(api_key=api_key)
 
         system_prompt = (
-            "Eres un sistema de moderación para un juego de Roblox. "
-            "Analiza el mensaje del jugador.\n\n"
+            "Eres un sistema de moderación de chat para Roblox. "
+            "Analiza el mensaje enviado por el usuario.\n\n"
             "REGLAS:\n"
-            "1. Mensaje normal o inofensivo -> OK\n"
-            "2. Mensaje tóxico, insulto o molestia -> REINICIAR\n"
-            "3. Acoso grave, insultos muy fuertes u odio -> BANEAR\n\n"
-            "Responde ÚNICAMENTE con una de estas palabras: OK, REINICIAR o BANEAR."
+            "1. Si el mensaje es inofensivo, normal o conversación común -> OK\n"
+            "2. Si es tóxico, un insulto leve o molestia -> REINICIAR\n"
+            "3. Si es acoso grave, insulto muy fuerte, odio o amenazas -> BANEAR\n\n"
+            "Responde ÚNICAMENTE con una de las tres palabras: OK, REINICIAR o BANEAR. No agregues nada más."
         )
 
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"{usuario}: {mensaje}"}
+                {"role": "user", "content": f"Usuario: {usuario}\nMensaje: \"{mensaje}\""}
             ],
             temperature=0.1,
         )
 
         decision = completion.choices[0].message.content.strip().upper()
-        return jsonify({"decision": decision})
+        
+        # Limpiar la respuesta por si el modelo devuelve algo extra
+        if "REINICIAR" in decision:
+            decision = "REINICIAR"
+        elif "BANEAR" in decision:
+            decision = "BANEAR"
+        else:
+            decision = "OK"
+
+        print(f"[{usuario}]: \"{mensaje}\" -> DECISION: {decision}")
+        return jsonify({"decision": decision}), 200
 
     except Exception as e:
-        print("ERROR AL CONECTAR CON GROQ:", str(e))
-        return jsonify({"decision": "OK", "error": str(e)}), 500
+        # En caso de cualquier falla imprevista, atrapa el error y responde OK con código HTTP 200
+        print("EXCEPCION EN PYTHON:", str(e))
+        return jsonify({"decision": "OK", "error": str(e)}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
