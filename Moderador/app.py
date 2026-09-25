@@ -6,29 +6,29 @@ app = Flask(__name__)
 
 @app.route('/chat', methods=['POST'])
 def analizar_contexto():
-    # Obtiene la variable guardada en Render
+    # Obtiene la clave justo cuando llega el mensaje de Roblox
     api_key = os.environ.get("GROQ_API_KEY")
 
     if not api_key:
-        print("ERROR: No se encontró la variable GROQ_API_KEY en Render")
-        return jsonify({"decision": "OK", "error": "Falta la API Key"}), 500
+        print("ERROR: GROQ_API_KEY no encontrada en Render")
+        return jsonify({"decision": "OK", "error": "Falta API Key"}), 500
 
     try:
-        # Crea el cliente con la clave
-        client = Groq(api_key=api_key)
-
         data = request.json or {}
         usuario = data.get("usuario", "Jugador")
         mensaje = data.get("prompt", "")
 
+        # Inicializa el cliente únicamente dentro de la petición
+        client = Groq(api_key=api_key)
+
         system_prompt = (
-            "Eres un sistema de moderación silencioso para Roblox. "
-            "Analiza el mensaje recibido.\n\n"
+            "Eres un sistema de moderación para un juego de Roblox. "
+            "Analiza el mensaje del jugador.\n\n"
             "REGLAS:\n"
             "1. Mensaje normal o inofensivo -> OK\n"
-            "2. Mensaje tóxico o insultante -> REINICIAR\n"
-            "3. Acoso grave o insultos fuertes -> BANEAR\n\n"
-            "Responde ÚNICAMENTE con una palabra: OK, REINICIAR o BANEAR."
+            "2. Mensaje tóxico, insulto o molestia -> REINICIAR\n"
+            "3. Acoso grave, insultos muy fuertes u odio -> BANEAR\n\n"
+            "Responde ÚNICAMENTE con una de estas palabras: OK, REINICIAR o BANEAR."
         )
 
         completion = client.chat.completions.create(
@@ -44,7 +44,7 @@ def analizar_contexto():
         return jsonify({"decision": decision})
 
     except Exception as e:
-        print("ERROR EXPLICITO DE GROQ:", str(e))
+        print("ERROR AL CONECTAR CON GROQ:", str(e))
         return jsonify({"decision": "OK", "error": str(e)}), 500
 
 if __name__ == '__main__':
