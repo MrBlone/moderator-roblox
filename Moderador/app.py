@@ -4,8 +4,9 @@ from groq import Groq
 
 app = Flask(__name__)
 
-# Pones tu clave de Groq aquí
-client = Groq(api_key="TU_API_KEY_DE_GROQ_AQUI")
+# Lee la clave guardada en la pestaña 'Environment' de Render
+api_key = os.environ.get("GROQ_API_KEY")
+client = Groq(api_key=api_key)
 
 historial_chat = []
 
@@ -16,6 +17,7 @@ def analizar_contexto():
     usuario = data.get("usuario", "Jugador")
     mensaje = data.get("prompt", "")
 
+    # Mantiene los últimos 6 mensajes del historial
     historial_chat.append(f"{usuario}: {mensaje}")
     if len(historial_chat) > 6:
         historial_chat.pop(0)
@@ -45,8 +47,9 @@ def analizar_contexto():
         decision = completion.choices[0].message.content.strip().upper()
         return jsonify({"decision": decision})
     except Exception as e:
-        return jsonify({"decision": "OK"}), 500
+        print("ERROR DE GROQ:", str(e))
+        return jsonify({"decision": "OK", "error": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
