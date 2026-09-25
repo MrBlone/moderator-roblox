@@ -16,6 +16,7 @@ def analizar_contexto():
         usuario = str(data.get("usuario", "Jugador"))
         mensaje = str(data.get("prompt", "")).strip()
 
+        # Ver mensaje en los logs de Render
         print(f"--> MENSAJE RECIBIDO DE ROBLOX | Usuario: {usuario} | Texto: '{mensaje}'")
 
         if not mensaje:
@@ -24,12 +25,12 @@ def analizar_contexto():
         client = Groq(api_key=api_key)
 
         system_prompt = (
-            "Eres un moderador estricto para un juego de Roblox. "
-            "Clasifica el mensaje del jugador en una de las siguientes categorías:\n\n"
-            "- OK: Saludos, charla normal, juego o frases inofensivas.\n"
-            "- REINICIAR: Insultos leves, groserías, toxicidad o molestias.\n"
-            "- BANEAR: Amenazas de muerte, acoso grave, discriminación o insultos muy fuertes.\n\n"
-            "REGLA OBLIGATORIA: Responde ÚNICAMENTE con la palabra exacta: OK, REINICIAR o BANEAR. No escribas nada más."
+            "Eres un moderador estricto de chat para un juego de Roblox. "
+            "Clasifica el mensaje en una sola palabra:\n\n"
+            "- REINICIAR: Si el mensaje contiene insultos, palabras tóxicas, groserías o faltas de respeto leves/moderadas.\n"
+            "- BANEAR: Si el mensaje contiene amenazas, deseos de muerte, acoso grave o discriminación.\n"
+            "- OK: ÚNICAMENTE si el mensaje es completamente inofensivo o charla normal del juego.\n\n"
+            "REGLA OBLIGATORIA: Responde SOLO con una de las palabras: OK, REINICIAR o BANEAR."
         )
 
         completion = client.chat.completions.create(
@@ -41,12 +42,12 @@ def analizar_contexto():
             temperature=0.0,
         )
 
-        respuesta_raw = completion.choices[0].message.content.strip().upper()
-        print(f"--> RESPUESTA DE GROQ: '{respuesta_raw}'")
+        respuesta = completion.choices[0].message.content.strip().upper()
+        print(f"--> DECISION DE GROQ: '{respuesta}'")
 
-        if "BANEAR" in respuesta_raw:
+        if "BANEAR" in respuesta:
             decision = "BANEAR"
-        elif "REINICIAR" in respuesta_raw:
+        elif "REINICIAR" in respuesta:
             decision = "REINICIAR"
         else:
             decision = "OK"
