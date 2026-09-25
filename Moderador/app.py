@@ -10,55 +10,50 @@ def analizar_contexto():
         api_key = os.environ.get("GROQ_API_KEY")
 
         if not api_key:
-            print("ERROR: GROQ_API_KEY no encontrada.")
             return jsonify({"decision": "OK", "error": "No API Key"}), 200
 
-        # Obtener los datos enviados por Roblox
         data = request.get_json(force=True, silent=True) or {}
         usuario = str(data.get("usuario", "Jugador"))
         mensaje = str(data.get("prompt", "")).strip()
 
-        # Si el mensaje está vacío, responder OK inmediatamente sin llamar a Groq
+        print(f"--> MENSAJE RECIBIDO DE ROBLOX | Usuario: {usuario} | Texto: '{mensaje}'")
+
         if not mensaje:
             return jsonify({"decision": "OK"}), 200
 
-        # Crear el cliente de Groq
         client = Groq(api_key=api_key)
 
         system_prompt = (
-            "Eres un sistema de moderación de chat para Roblox. "
-            "Analiza el mensaje enviado por el usuario.\n\n"
-            "REGLAS:\n"
-            "1. Si el mensaje es inofensivo, normal o conversación común -> OK\n"
-            "2. Si es tóxico, un insulto leve o molestia -> REINICIAR\n"
-            "3. Si es acoso grave, insulto muy fuerte, odio o amenazas -> BANEAR\n\n"
-            "Responde ÚNICAMENTE con una de las tres palabras: OK, REINICIAR o BANEAR. No agregues nada más."
+            "Eres un moderador estricto para un juego de Roblox. "
+            "Clasifica el mensaje del jugador en una de las siguientes categorías:\n\n"
+            "- OK: Saludos, charla normal, juego o frases inofensivas.\n"
+            "- REINICIAR: Insultos leves, groserías, toxicidad o molestias.\n"
+            "- BANEAR: Amenazas de muerte, acoso grave, discriminación o insultos muy fuertes.\n\n"
+            "REGLA OBLIGATORIA: Responde ÚNICAMENTE con la palabra exacta: OK, REINICIAR o BANEAR. No escribas nada más."
         )
 
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Usuario: {usuario}\nMensaje: \"{mensaje}\""}
+                {"role": "user", "content": f"Mensaje de {usuario}: {mensaje}"}
             ],
-            temperature=0.1,
+            temperature=0.0,
         )
 
-        decision = completion.choices[0].message.content.strip().upper()
-        
-        # Limpiar la respuesta por si el modelo devuelve algo extra
-        if "REINICIAR" in decision:
-            decision = "REINICIAR"
-        elif "BANEAR" in decision:
+        respuesta_raw = completion.choices[0].message.content.strip().upper()
+        print(f"--> RESPUESTA DE GROQ: '{respuesta_raw}'")
+
+        if "BANEAR" in respuesta_raw:
             decision = "BANEAR"
+        elif "REINICIAR" in respuesta_raw:
+            decision = "REINICIAR"
         else:
             decision = "OK"
 
-        print(f"[{usuario}]: \"{mensaje}\" -> DECISION: {decision}")
         return jsonify({"decision": decision}), 200
 
     except Exception as e:
-        # En caso de cualquier falla imprevista, atrapa el error y responde OK con código HTTP 200
         print("EXCEPCION EN PYTHON:", str(e))
         return jsonify({"decision": "OK", "error": str(e)}), 200
 
